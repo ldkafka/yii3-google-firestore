@@ -1,0 +1,7 @@
+parameters:
+    level: 9
+    paths:
+        - src
+        - tests
+    # Runtime checks guard the public API against callers that ignore the PHPDoc types.
+    treatPhpDocTypesAsCertain: false
