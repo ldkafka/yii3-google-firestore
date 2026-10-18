@@ -137,6 +137,41 @@ final class FirestoreClientTest extends TestCase
         $http->client()->query('c')->get();
     }
 
+    /**
+     * @return iterable<string, array{int, string, class-string<ApiException>}>
+     */
+    public static function streamedErrors(): iterable
+    {
+        yield 'missing index' => [400, 'FAILED_PRECONDITION', FailedPreconditionException::class];
+        yield 'missing database' => [404, 'NOT_FOUND', NotFoundException::class];
+    }
+
+    /**
+     * @param class-string<ApiException> $class
+     */
+    #[DataProvider('streamedErrors')]
+    public function testAStreamedErrorOnAnErrorAnswerGivesItsStatus(int $http, string $status, string $class): void
+    {
+        $queue = (new QueueHttpClient())->json($http, [['error' => ['code' => $http, 'message' => 'from the server', 'status' => $status]]]);
+
+        try {
+            $queue->client()->query('c')->get();
+            self::fail('expected exception');
+        } catch (ApiException $e) {
+            self::assertSame([$class, $status, $http, 'runQuery'], [$e::class, $e->status, $e->httpStatus, $e->method]);
+            self::assertStringContainsString('from the server', $e->getMessage());
+        }
+    }
+
+    public function testANotFoundWithoutAJsonBodyIsNotFound(): void
+    {
+        $http = (new QueueHttpClient())->json(404, '<!DOCTYPE html><title>Error 404 (Not Found)</title>');
+
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('NOT_FOUND (HTTP 404)');
+        $http->client()->query('c')->get();
+    }
+
     public function testAnErrorWithoutABodyFallsBackOnTheHttpCode(): void
     {
         $http = (new QueueHttpClient())->json(400, 'not json');

@@ -5,6 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 [Semantic Versioning](https://semver.org/). In 0.x a minor release may break the API; such a release
 has a "Backwards compatibility" section. Patch releases never do.
 
+## [0.1.1] - Unreleased
+
+### Fixed
+- An error answer (non-2xx) whose body is a list, as `runQuery` streams it (`[{"error": {...}}]`),
+  now gives the element's status and message (e.g. `FAILED_PRECONDITION` for a missing index,
+  `NOT_FOUND` for a missing database) instead of `UNKNOWN`.
+- An HTTP 404 without a JSON body is `NOT_FOUND` (`NotFoundException`), not `UNKNOWN`.
+
 ## [0.1.0] - Unreleased
 
 ### Added

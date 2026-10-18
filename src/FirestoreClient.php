@@ -70,6 +70,7 @@ final class FirestoreClient
         self::CALL_TRANSACTION_COMMIT => ['RESOURCE_EXHAUSTED'],
     ];
     private const HTTP_FALLBACK_STATUS = [
+        404 => 'NOT_FOUND',
         429 => 'RESOURCE_EXHAUSTED',
         500 => 'INTERNAL',
         502 => 'UNAVAILABLE',
@@ -486,19 +487,23 @@ final class FirestoreClient
 
         $httpStatus = $response->getStatusCode();
         $data = json_decode((string) $response->getBody(), true, 512, JSON_BIGINT_AS_STRING);
+        // A streamed answer (runQuery) is a list, and its error is an element's `error`, also on a non-2xx answer.
+        $listError = null;
+        foreach (is_array($data) && array_is_list($data) ? $data : [] as $item) {
+            if (is_array($item) && isset($item['error'])) {
+                $listError = $item['error'];
+                break;
+            }
+        }
         if ($httpStatus < 200 || $httpStatus >= 300) {
-            throw $this->apiError($method, $httpStatus, is_array($data) ? $data['error'] ?? null : null);
+            throw $this->apiError($method, $httpStatus, is_array($data) ? $data['error'] ?? $listError : null);
         }
         if (!is_array($data)) {
             throw ApiException::forStatus($method, $httpStatus, 'UNKNOWN', 'the answer is not JSON');
         }
-        if (array_is_list($data)) {
-            foreach ($data as $item) {
-                if (is_array($item) && isset($item['error'])) {
-                    $code = is_array($item['error']) ? $item['error']['code'] ?? 0 : 0;
-                    throw $this->apiError($method, is_int($code) ? $code : 0, $item['error']);
-                }
-            }
+        if ($listError !== null) {
+            $code = is_array($listError) ? $listError['code'] ?? 0 : 0;
+            throw $this->apiError($method, is_int($code) ? $code : 0, $listError);
         }
 
         return $data;
